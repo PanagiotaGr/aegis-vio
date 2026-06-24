@@ -126,6 +126,7 @@ docs/
 
 
 
+---
 
 
 
@@ -134,7 +135,7 @@ docs/
 
 
 
-Future Work
+ ###nFuture Work
 EKF-based uncertainty propagation
 Full Visual-Inertial Odometry pipeline
 Uncertainty-aware path planning
