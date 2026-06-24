@@ -1,0 +1,4 @@
+aegis_vio:
+  ros__parameters:
+    use_sim_time: false
+    mode: research
