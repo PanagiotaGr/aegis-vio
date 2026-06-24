@@ -1,0 +1,5 @@
+std_msgs/Header header
+float64 covariance_trace
+float64 covariance_entropy
+float64 uncertainty_score
+string navigation_mode
