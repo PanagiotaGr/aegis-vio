@@ -1,0 +1,4 @@
+dataset:
+  name: euroc_mav
+  sequence_path: datasets/euroc/MH_01_easy
+  camera: cam0
