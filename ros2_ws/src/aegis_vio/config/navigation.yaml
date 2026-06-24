@@ -1,0 +1,6 @@
+navigation:
+  cautious_threshold: 0.10
+  recovery_threshold: 0.35
+  nominal_speed: 1.0
+  cautious_speed: 0.5
+  recovery_speed: 0.2
