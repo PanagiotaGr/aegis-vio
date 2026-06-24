@@ -1,0 +1,5 @@
+ekf:
+  state_dim: 6
+  initial_covariance: 0.1
+  process_noise: 0.001
+  measurement_noise: 0.05
