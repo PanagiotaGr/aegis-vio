@@ -18,8 +18,13 @@ imu["accel_norm"] = np.sqrt(imu["a_x"]**2 + imu["a_y"]**2 + imu["a_z"]**2)
 
 # Κάνουμε downsample το IMU ώστε να ταιριάξει περίπου με τα frame pairs
 n = len(visual_df)
-imu_chunks = np.array_split(imu, n)
-
+imu_chunks = [
+    imu.iloc[start:end]
+    for start, end in zip(
+        np.linspace(0, len(imu), n, endpoint=False, dtype=int),
+        np.linspace(0, len(imu), n + 1, dtype=int)[1:]
+    )
+]
 imu_instability = []
 for chunk in imu_chunks:
     gyro_std = chunk["gyro_norm"].std()
