@@ -18,6 +18,30 @@ The goal of AegisVIO is to investigate:
 - Risk-aware navigation policies
 - Autonomous decision making under uncertainty
 
+
+## Research Contributions
+
+AegisVIO currently investigates the following research contributions:
+
+1. **Visual Feature Quality Estimation**  
+   Extraction and evaluation of ORB feature matches on EuRoC MAV image sequences using match count and geometric inlier ratio.
+
+2. **Visual Uncertainty Estimation**  
+   Conversion of visual feature degradation into an uncertainty signal that reflects the reliability of the visual front-end.
+
+3. **IMU Stability Analysis**  
+   Use of gyroscope and accelerometer statistics to estimate inertial instability during motion.
+
+4. **Multi-Modal Uncertainty Fusion**  
+   Combination of visual uncertainty and IMU instability into a unified multi-modal uncertainty score.
+
+5. **Failure Prediction Dataset**  
+   Construction of a dataset for predicting future localization degradation using visual and inertial uncertainty indicators.
+
+6. **Risk-Aware Navigation Direction**  
+   Early formulation of a navigation policy where robot behavior can adapt according to estimated uncertainty.
+
+
 ---
 
 ## Current Pipeline
@@ -111,6 +135,19 @@ Fusion of:
 - IMU instability
 
 ---
+
+## Latest Result
+
+A failure prediction dataset was generated from 300 EuRoC MH_01_easy frame pairs.
+
+Class distribution:
+
+- Normal: 240 samples
+- Failure: 60 samples
+
+This dataset will be used for training machine learning models to predict future localization degradation from uncertainty signals.
+
+
 
 ## Repository Structure
 
