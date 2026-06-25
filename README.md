@@ -1,195 +1,119 @@
-# AegisVIO
+# AEGIS-VIO
 
-Uncertainty-Aware Visual-Inertial Navigation for Autonomous Robots
+**Uncertainty-Aware Visual-Inertial Navigation in Challenging Environments**
 
-AegisVIO is a research-oriented robotics project that explores how visual perception quality and inertial sensing can be combined to estimate uncertainty and support safer navigation decisions in autonomous systems.
-
----
-
-## Research Motivation
-
-Visual-Inertial Odometry (VIO) systems often operate in challenging environments where perception quality may degrade due to motion blur, low texture, illumination changes, or sensor noise.
-
-The goal of AegisVIO is to investigate:
-
-- Visual feature quality estimation
-- Uncertainty-aware perception
-- Multi-modal uncertainty fusion
-- Risk-aware navigation policies
-- Autonomous decision making under uncertainty
-
-
-## Research Contributions
-
-AegisVIO currently investigates the following research contributions:
-
-1. **Visual Feature Quality Estimation**  
-   Extraction and evaluation of ORB feature matches on EuRoC MAV image sequences using match count and geometric inlier ratio.
-
-2. **Visual Uncertainty Estimation**  
-   Conversion of visual feature degradation into an uncertainty signal that reflects the reliability of the visual front-end.
-
-3. **IMU Stability Analysis**  
-   Use of gyroscope and accelerometer statistics to estimate inertial instability during motion.
-
-4. **Multi-Modal Uncertainty Fusion**  
-   Combination of visual uncertainty and IMU instability into a unified multi-modal uncertainty score.
-
-5. **Failure Prediction Dataset**  
-   Construction of a dataset for predicting future localization degradation using visual and inertial uncertainty indicators.
-
-6. **Risk-Aware Navigation Direction**  
-   Early formulation of a navigation policy where robot behavior can adapt according to estimated uncertainty.
-
+A research-oriented Visual-Inertial Odometry (VIO) pipeline that estimates
+not only robot pose but also calibrated estimation **uncertainty**, and
+uses that uncertainty to **adapt navigation behavior** (speed, safety
+margins, halt/recovery) in real time. Built as a portfolio/thesis-level
+project in the spirit of ETH Zurich's Vision for Robotics Lab (V4RL)
+research direction on active perception and risk-aware autonomy.
 
 ---
 
-## Current Pipeline
+## Why uncertainty-aware navigation?
 
-EuRoC MAV Dataset
+Most VIO/SLAM front-ends silently degrade in motion blur, low light,
+feature-poor corridors, or under fast motion — the pose estimate keeps
+being published even as its true error grows. AEGIS-VIO instead exposes
+a calibrated, real-time **risk score** derived from the EKF error-state
+covariance and couples it directly to navigation: the robot slows down,
+inflates safety margins, or halts *before* it silently drifts into a
+collision, rather than after.
 
-↓
+```
+ IMU  ──┐
+        ├──▶  ErrorStateEKF  ──▶  Uncertainty Metrics  ──▶  Uncertainty-Aware
+ Camera─┘     (state + cov)       (trace/det/entropy/        Navigator
+              ▲                    risk score)               (speed/margin/
+              │                                                halt decisions)
+        Feature Tracker
+        (vision-quality score)
+```
 
-ORB Feature Tracking
+## Repository layout
 
-↓
+```
+aegis-vio/
+├── src/                          # core, ROS2-independent Python library
+│   ├── dataset_loader.py         # EuRoC/TUM-VI dataset reader
+│   ├── feature_tracker.py        # KLT optical-flow front-end + quality score
+│   ├── imu_integrator.py         # strap-down IMU mechanization + Jacobians
+│   ├── vio_estimator.py          # front-end + EKF orchestration
+│   ├── ekf.py                    # error-state EKF (predict/update)
+│   ├── uncertainty.py            # trace/det/entropy/Mahalanobis/NEES/NIS/risk
+│   ├── navigation.py             # uncertainty -> speed/margin/mode mapping
+│   ├── uncertainty_aware_controller.py  # top-level control loop
+│   ├── evaluator.py              # ATE/RPE/consistency metrics
+│   └── visualization.py          # publication-quality plots
+├── ros2_ws/src/aegis_vio/        # ROS2 package (live operation)
+│   ├── aegis_vio/                # vio_node, navigation_node, uncertainty_node
+│   ├── launch/aegis_vio.launch.py
+│   ├── config/{config,dataset,ekf,navigation}.yaml
+│   └── msg/{StateEstimate,UncertaintyMetrics}.msg
+├── scripts/                      # run_euroc.py, evaluate_results.py, download_euroc.py
+├── tests/                        # pytest unit tests for every src/ module
+├── datasets/ models/ results/ plots/   # working directories (gitkept, gitignored content)
+├── docs/                         # installation.md, usage.md, experiments.md
+├── requirements.txt
+├── setup.py
+└── README.md
+```
 
-Feature Quality Estimation
+## Quick start
 
-↓
+```bash
+pip install -r requirements.txt && pip install -e .
+python scripts/download_euroc.py --sequence MH_01_easy
+python scripts/run_euroc.py --dataset_root ./datasets/MH_01_easy/mav0 --output_dir ./results/MH_01_easy
+python scripts/evaluate_results.py --results_dir ./results/MH_01_easy --dataset_root ./datasets/MH_01_easy/mav0
+pytest tests/ -v
+```
 
-Visual Uncertainty Estimation
+See `docs/installation.md` and `docs/usage.md` for full details, and
+`docs/experiments.md` for the challenging-environment evaluation protocol
+(motion blur, low light, dynamic objects, fast motion, feature-poor
+scenes, sensor noise, IMU drift).
 
-↓
+## Method summary
 
-IMU Stability Analysis
+- **State estimation:** 16-dim nominal state (position, velocity,
+  orientation quaternion, gyro/accel biases), 15-dim error-state
+  Extended Kalman Filter following Solà (2017)'s quaternion
+  error-state formulation.
+- **Front-end:** Shi-Tomasi/KLT pyramidal optical flow with a composite
+  vision-quality score (feature count, track age, spatial spread) that
+  modulates measurement noise — poorer visual conditions are mapped to
+  larger innovation covariance, which is the key mechanism coupling
+  front-end health to propagated uncertainty.
+- **Uncertainty quantification:** covariance trace/determinant,
+  differential entropy, Mahalanobis distance, 95%-confidence ellipsoids,
+  and filter-consistency diagnostics (NEES/NIS with chi-square bounds).
+- **Navigation:** a thresholded risk-score state machine
+  (NORMAL → CAUTIOUS → RECOVERY → HALT) that scales commanded velocity
+  and inflates obstacle safety margins; includes a greedy active-
+  perception waypoint-selection heuristic.
+- **Evaluation:** ATE/RPE via Umeyama Sim(3)/SE(3) alignment, tracking
+  failure rate, and NEES/NIS consistency testing, matching standard
+  VIO/SLAM benchmarking practice (EuRoC MAV, TUM-VI conventions).
 
-↓
+## Status / research extensions
 
-Multi-Modal Uncertainty Fusion
+The shipped pseudo-measurement update in `vio_estimator.py` is an
+intentionally simplified, documented placeholder for a full multi-view
+reprojection-error update (à la MSCKF/OpenVINS). Documented next steps
+(see `docs/experiments.md` and the accompanying research proposal):
 
-↓
+1. Learned uncertainty prediction (CNN/Transformer mapping image
+   patches → predicted observation noise).
+2. Full landmark triangulation + reprojection-error EKF/factor-graph
+   back-end (GTSAM integration point already scaffolded in
+   `requirements.txt`).
+3. Active viewpoint selection for next-best-view exploration.
+4. Risk-aware trajectory planning (cost-map inflation is scaffolded in
+   `navigation.inflate_obstacle_costmap`).
+5. Uncertainty-aware keyframe/marginalization selection.
 
-Adaptive Navigation Policy
+## License
 
----
-
-## Dataset
-
-This project currently uses the EuRoC MAV Dataset from ETH Zurich.
-
-Dataset:
-https://doi.org/10.3929/ethz-b-000690084
-
-Sequences currently tested:
-
-- MH_01_easy
-
----
-
-## Implemented Experiments
-
-### Experiment 001
-EuRoC Dataset Loading
-
-Results:
-
-- 3682 stereo frames
-- 36820 IMU packets
-- Ground-truth available
-
-### Experiment 002
-Synthetic Feature Tracking
-
-ORB feature extraction and matching on synthetic scenes.
-
-### Experiment 003
-Real EuRoC Feature Tracking
-
-Results (MH_01_easy):
-
-- Matches: 1029
-- Inlier Ratio: 0.708
-
-### Experiment 004
-Feature Quality Analysis
-
-300 frame pairs evaluated.
-
-Results:
-
-- Mean Matches: 871
-- Mean Inlier Ratio: 0.716
-
-### Experiment 005
-Visual Uncertainty Estimation
-
-Visual uncertainty derived from feature quality degradation.
-
-### Experiment 006
-Multi-Modal Uncertainty
-
-Fusion of:
-
-- Visual uncertainty
-- IMU instability
-
----
-
-## Latest Result
-
-A failure prediction dataset was generated from 300 EuRoC MH_01_easy frame pairs.
-
-Class distribution:
-
-- Normal: 240 samples
-- Failure: 60 samples
-
-This dataset will be used for training machine learning models to predict future localization degradation from uncertainty signals.
-
-
-
-## Repository Structure
-
-```text
-src/
-ros2_ws/
-scripts/
-tests/
-datasets/
-results/
-plots/
-docs/
-
-
-
----
-
-
-
-
-
-
-
-
- ###nFuture Work
-EKF-based uncertainty propagation
-Full Visual-Inertial Odometry pipeline
-Uncertainty-aware path planning
-Risk-aware navigation
-ROS2 deployment
-Real robot experiments
-Author
-
-Panagiota Grosdouli
-
-Electrical & Computer Engineering
-Democritus University of Thrace
-
-Research Interests:
-
-Robotics
-Visual-Inertial Odometry
-Motion Prediction
-Autonomous Systems
-Uncertainty-Aware AI
+MIT
