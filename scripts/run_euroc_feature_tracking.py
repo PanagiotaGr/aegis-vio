@@ -4,7 +4,7 @@ import cv2
 from src.dataset_loader import EuRoCDatasetLoader
 from src.feature_tracker import ORBFeatureTracker
 
-sequence = "datasets/euroc/machine_hall/MH_01_easy"
+sequence = "datasets/euroc/machine_hall/machine_hall/MH_05_difficult"
 
 loader = EuRoCDatasetLoader(sequence)
 

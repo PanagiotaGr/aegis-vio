@@ -4,7 +4,7 @@ import pandas as pd
 
 from src.feature_tracker import ORBFeatureTracker
 
-sequence = "datasets/euroc/machine_hall/MH_01_easy"
+sequence = "datasets/euroc/machine_hall/machine_hall/MH_05_difficult"
 
 image_paths = sorted(
     (Path(sequence) / "mav0" / "cam0" / "data").glob("*.png")

@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 
 from src.dataset_loader import EuRoCDatasetLoader
 
-sequence = "datasets/euroc/machine_hall/MH_01_easy"
+sequence = "datasets/euroc/machine_hall/machine_hall/MH_05_difficult"
 
 visual_df = pd.read_csv("results/visual_uncertainty/visual_uncertainty.csv")
 
