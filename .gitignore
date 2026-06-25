@@ -24,3 +24,13 @@ results/*
 .DS_Store
 .vscode/
 .idea/
+
+# Local environments/cache
+venv/
+.pytest_cache/
+__pycache__/
+*.egg-info/
+
+# Large local datasets
+datasets/euroc/
+*.bag
