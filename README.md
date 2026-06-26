@@ -137,7 +137,7 @@ Planned extensions:
    scaffolded in `navigation.inflate_obstacle_costmap`).
 5. **Uncertainty-aware keyframe/marginalization selection.**
 
-## 🙏Acknowledgements
+## Acknowledgements
 
 Built in the spirit of the visual-inertial state estimation, active
 perception, and risk-aware autonomy research direction pursued by
