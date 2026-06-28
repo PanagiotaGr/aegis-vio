@@ -8,9 +8,13 @@ const blurSlider = document.getElementById('blurSlider');
 const lightSlider = document.getElementById('lightSlider');
 const imuSlider = document.getElementById('imuSlider');
 const modeText = document.getElementById('modeText');
+const modeHint = document.getElementById('modeHint');
 const modeCard = document.getElementById('modeCard');
 const riskValue = document.getElementById('riskValue');
 const qualityValue = document.getElementById('qualityValue');
+const speedValue = document.getElementById('speedValue');
+const errorValue = document.getElementById('errorValue');
+const covValue = document.getElementById('covValue');
 const riskBar = document.getElementById('riskBar');
 const qualityBar = document.getElementById('qualityBar');
 
@@ -21,16 +25,32 @@ const modeColors = {
   HALT: '#ef4444',
 };
 
+const modeHints = {
+  NORMAL: 'Full speed. Localization is trusted.',
+  CAUTIOUS: 'Reduced speed. Safety margin is wider.',
+  RECOVERY: 'Slow recovery. The robot searches for safer perception.',
+  HALT: 'Robot stopped. Risk is too high.',
+};
+
+const obstacles = [
+  { x: 260, y: 135, w: 90, h: 120 },
+  { x: 515, y: 360, w: 120, h: 85 },
+  { x: 730, y: 165, w: 95, h: 150 },
+];
+const goal = { x: 900, y: 505 };
+
 let running = false;
 let frameId = null;
 let t = 0;
 let covariance = 0.04;
 let risk = 0;
 let quality = 1;
-let robot = { x: 90, y: 280 };
-let estimate = { x: 90, y: 280 };
+let speedScale = 1;
+let robot = { x: 80, y: 500 };
+let estimate = { x: 80, y: 500 };
 let truthTrail = [];
 let estimateTrail = [];
+let lastError = 0;
 
 function clamp(value, min, max) {
   return Math.min(max, Math.max(min, value));
@@ -44,9 +64,10 @@ function modeFromRisk(value) {
 }
 
 function referencePoint(step) {
-  const x = 90 + step * 1.35;
-  const y = 280 + Math.sin(step * 0.035) * 96 + Math.sin(step * 0.012) * 30;
-  return { x, y };
+  const phase = step / 620;
+  const x = 80 + phase * 820;
+  const y = 500 - phase * 345 + Math.sin(step * 0.026) * 85 + Math.sin(step * 0.008) * 30;
+  return { x, y: clamp(y, 80, 530) };
 }
 
 function reset() {
@@ -57,20 +78,26 @@ function reset() {
   covariance = 0.04;
   risk = 0;
   quality = 1;
-  robot = { x: 90, y: 280 };
-  estimate = { x: 90, y: 280 };
+  speedScale = 1;
+  robot = { x: 80, y: 500 };
+  estimate = { x: 80, y: 500 };
   truthTrail = [robot];
   estimateTrail = [estimate];
+  lastError = 0;
   updateUi('NORMAL');
   draw();
 }
 
 function updateUi(mode) {
   modeText.textContent = mode;
+  modeHint.textContent = modeHints[mode];
   modeCard.style.borderColor = modeColors[mode];
   modeCard.style.background = `linear-gradient(135deg, ${modeColors[mode]}33, rgba(105, 230, 255, 0.08))`;
   riskValue.textContent = risk.toFixed(2);
   qualityValue.textContent = quality.toFixed(2);
+  speedValue.textContent = `${speedScale.toFixed(2)}x`;
+  errorValue.textContent = `${(lastError / 18).toFixed(1)} m`;
+  covValue.textContent = covariance.toFixed(2);
   riskBar.style.width = `${risk * 100}%`;
   riskBar.style.background = modeColors[mode];
   qualityBar.style.width = `${quality * 100}%`;
@@ -81,45 +108,52 @@ function step() {
   const blur = Number(blurSlider.value);
   const lowLight = Number(lightSlider.value);
   const imuNoise = Number(imuSlider.value);
-
-  const [mode, speedScale] = modeFromRisk(risk);
-  const speed = 1.6 * speedScale;
-  t += speed;
+  const [, nextSpeedScale] = modeFromRisk(risk);
+  speedScale = nextSpeedScale;
+  t += 2.2 * speedScale;
 
   robot = referencePoint(t);
+  const obstaclePenalty = obstacles.some(o => robot.x > o.x - 55 && robot.x < o.x + o.w + 55 && robot.y > o.y - 55 && robot.y < o.y + o.h + 55) ? 0.12 : 0;
+  const lightingWave = 0.5 + 0.5 * Math.sin(t * 0.028);
+  quality = clamp(1 - 0.38 * blur - 0.44 * lowLight - 0.14 * lightingWave - obstaclePenalty, 0.05, 1);
 
-  const disturbanceWindow = 0.5 + 0.5 * Math.sin(t * 0.03);
-  quality = clamp(1 - 0.42 * blur - 0.48 * lowLight - 0.20 * disturbanceWindow, 0.05, 1);
+  covariance += 0.0035 + imuNoise * 0.026 + (1 - quality) * 0.045;
+  if (quality > 0.74) covariance *= 0.962;
+  covariance = clamp(covariance, 0.02, 4.4);
 
-  covariance += 0.004 + imuNoise * 0.025 + (1 - quality) * 0.05;
-  if (quality > 0.72) covariance *= 0.965;
-  covariance = clamp(covariance, 0.02, 4.2);
-
-  risk = clamp((covariance / Math.max(quality, 0.05)) / 4.2, 0, 1);
+  risk = clamp((covariance / Math.max(quality, 0.05)) / 4.3, 0, 1);
   const [newMode] = modeFromRisk(risk);
 
-  const driftScale = 2.5 + covariance * 3.5;
+  const driftScale = 3 + covariance * 4.2;
   estimate = {
-    x: robot.x + Math.sin(t * 0.07) * driftScale + imuNoise * 14,
-    y: robot.y + Math.cos(t * 0.05) * driftScale - lowLight * 16,
+    x: robot.x + Math.sin(t * 0.065) * driftScale + imuNoise * 16,
+    y: robot.y + Math.cos(t * 0.052) * driftScale - lowLight * 18,
   };
+  lastError = Math.hypot(estimate.x - robot.x, estimate.y - robot.y);
 
   truthTrail.push({ ...robot });
   estimateTrail.push({ ...estimate });
-  if (truthTrail.length > 420) truthTrail.shift();
-  if (estimateTrail.length > 420) estimateTrail.shift();
+  if (truthTrail.length > 460) truthTrail.shift();
+  if (estimateTrail.length > 460) estimateTrail.shift();
 
   updateUi(newMode);
   draw();
 
-  if (robot.x > canvas.width - 70) {
+  if (robot.x > goal.x - 12 || t > 640) {
     t = 0;
+    covariance *= 0.55;
     truthTrail = [];
     estimateTrail = [];
   }
 }
 
 function drawGrid() {
+  const gradient = ctx.createLinearGradient(0, 0, canvas.width, canvas.height);
+  gradient.addColorStop(0, '#07101d');
+  gradient.addColorStop(1, '#0b1a2c');
+  ctx.fillStyle = gradient;
+  ctx.fillRect(0, 0, canvas.width, canvas.height);
+
   ctx.strokeStyle = 'rgba(255,255,255,0.055)';
   ctx.lineWidth = 1;
   for (let x = 0; x <= canvas.width; x += 45) {
@@ -136,6 +170,30 @@ function drawGrid() {
   }
 }
 
+function drawObstacles() {
+  for (const obstacle of obstacles) {
+    ctx.fillStyle = 'rgba(239, 68, 68, 0.18)';
+    ctx.strokeStyle = 'rgba(239, 68, 68, 0.65)';
+    ctx.lineWidth = 2;
+    roundRect(obstacle.x, obstacle.y, obstacle.w, obstacle.h, 14);
+    ctx.fill();
+    ctx.stroke();
+  }
+}
+
+function drawGoal() {
+  ctx.beginPath();
+  ctx.arc(goal.x, goal.y, 20, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(74, 222, 128, 0.20)';
+  ctx.fill();
+  ctx.strokeStyle = '#4ade80';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+  ctx.fillStyle = '#4ade80';
+  ctx.font = '700 13px system-ui, sans-serif';
+  ctx.fillText('GOAL', goal.x - 18, goal.y - 28);
+}
+
 function drawTrail(points, color, width) {
   if (points.length < 2) return;
   ctx.strokeStyle = color;
@@ -146,9 +204,22 @@ function drawTrail(points, color, width) {
   ctx.stroke();
 }
 
+function drawLidar(cx, cy, mode) {
+  ctx.strokeStyle = `${modeColors[mode]}55`;
+  ctx.lineWidth = 1;
+  for (let i = 0; i < 18; i++) {
+    const a = (i / 18) * Math.PI * 2;
+    const length = 48 + quality * 58;
+    ctx.beginPath();
+    ctx.moveTo(cx, cy);
+    ctx.lineTo(cx + Math.cos(a) * length, cy + Math.sin(a) * length);
+    ctx.stroke();
+  }
+}
+
 function drawRobot() {
   const [mode] = modeFromRisk(risk);
-  const radius = 12 + risk * 26;
+  const radius = 16 + risk * 42;
 
   ctx.beginPath();
   ctx.arc(estimate.x, estimate.y, radius, 0, Math.PI * 2);
@@ -158,10 +229,20 @@ function drawRobot() {
   ctx.lineWidth = 2;
   ctx.stroke();
 
-  ctx.beginPath();
-  ctx.arc(robot.x, robot.y, 10, 0, Math.PI * 2);
+  drawLidar(robot.x, robot.y, mode);
+
+  ctx.save();
+  ctx.translate(robot.x, robot.y);
+  ctx.rotate(Math.sin(t * 0.035) * 0.35);
   ctx.fillStyle = '#69e6ff';
+  ctx.strokeStyle = '#dffbff';
+  ctx.lineWidth = 2;
+  roundRect(-17, -13, 34, 26, 8);
   ctx.fill();
+  ctx.stroke();
+  ctx.fillStyle = '#06101d';
+  ctx.fillRect(2, -5, 10, 10);
+  ctx.restore();
 
   ctx.beginPath();
   ctx.arc(estimate.x, estimate.y, 8, 0, Math.PI * 2);
@@ -170,15 +251,28 @@ function drawRobot() {
 }
 
 function drawLegend() {
-  ctx.fillStyle = 'rgba(238,245,255,0.9)';
+  ctx.fillStyle = 'rgba(238,245,255,0.92)';
   ctx.font = '14px system-ui, sans-serif';
-  ctx.fillText('cyan: ground truth', 22, 32);
-  ctx.fillText('mode color: estimated pose + uncertainty radius', 22, 54);
+  ctx.fillText('cyan robot: ground truth pose', 22, 32);
+  ctx.fillText('white path: estimated trajectory', 22, 54);
+  ctx.fillText('colored bubble: uncertainty / safety margin', 22, 76);
+}
+
+function roundRect(x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.arcTo(x + w, y, x + w, y + h, r);
+  ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r);
+  ctx.arcTo(x, y, x + w, y, r);
+  ctx.closePath();
 }
 
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawGrid();
+  drawGoal();
+  drawObstacles();
   drawTrail(truthTrail, '#69e6ff', 3);
   drawTrail(estimateTrail, '#f8fafc', 2);
   drawRobot();
