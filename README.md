@@ -60,6 +60,16 @@ python scripts/evaluate_results.py --results_dir ./results/MH_01_easy --dataset_
 pytest tests/ -v
 ```
 
+### Synthetic simulation
+
+For a lightweight demo that does not require downloading EuRoC/TUM-VI data:
+
+```bash
+python scripts/run_simulation.py --scenario mixed --output_dir results/simulation
+```
+
+This creates a synthetic trajectory, degrades visual quality, propagates covariance, computes risk, and exports CSV/plots. See [`docs/simulation.md`](docs/simulation.md).
+
 Want it running live on a robot? `ros2 launch aegis_vio aegis_vio.launch.py` — see [`docs/usage.md`](docs/usage.md).
 
 ## What's actually inside
@@ -93,10 +103,10 @@ aegis-vio/
 │   ├── launch/aegis_vio.launch.py
 │   ├── config/{config,dataset,ekf,navigation}.yaml
 │   └── msg/{StateEstimate,UncertaintyMetrics}.msg
-├── scripts/                      # run_euroc.py · evaluate_results.py · download_euroc.py
+├── scripts/                      # run_euroc.py · evaluate_results.py · download_euroc.py · run_simulation.py
 ├── tests/                        # pytest unit tests for every src/ module
 ├── datasets/ models/ results/ plots/   # working directories
-├── docs/                         # installation.md · usage.md · experiments.md
+├── docs/                         # installation.md · usage.md · experiments.md · simulation.md
 ├── requirements.txt
 ├── setup.py
 └── README.md
