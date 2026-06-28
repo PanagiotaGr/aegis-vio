@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>AEGIS-VIO Interactive Simulation</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="app">
+    <section class="hero">
+      <p class="eyebrow">AEGIS-VIO</p>
+      <h1>Uncertainty-aware navigation simulation</h1>
+      <p>
+        A lightweight browser demo showing how visual degradation and IMU noise
+        increase localization uncertainty, raise the risk score, and change robot behavior.
+      </p>
+    </section>
+
+    <section class="layout">
+      <article class="panel canvas-panel">
+        <canvas id="simCanvas" width="900" height="560" aria-label="2D robot simulation"></canvas>
+      </article>
+
+      <aside class="panel controls">
+        <div class="mode-card" id="modeCard">
+          <span class="label">Navigation mode</span>
+          <strong id="modeText">NORMAL</strong>
+        </div>
+
+        <div class="metric">
+          <span>Risk score</span>
+          <strong id="riskValue">0.00</strong>
+          <div class="bar"><div id="riskBar"></div></div>
+        </div>
+
+        <div class="metric">
+          <span>Visual quality</span>
+          <strong id="qualityValue">1.00</strong>
+          <div class="bar"><div id="qualityBar"></div></div>
+        </div>
+
+        <label>
+          Motion blur
+          <input id="blurSlider" type="range" min="0" max="1" step="0.01" value="0.30" />
+        </label>
+
+        <label>
+          Low light
+          <input id="lightSlider" type="range" min="0" max="1" step="0.01" value="0.20" />
+        </label>
+
+        <label>
+          IMU noise
+          <input id="imuSlider" type="range" min="0" max="1" step="0.01" value="0.25" />
+        </label>
+
+        <div class="buttons">
+          <button id="startBtn">Start</button>
+          <button id="pauseBtn">Pause</button>
+          <button id="resetBtn">Reset</button>
+        </div>
+
+        <p class="hint">
+          Raise blur, low light, or IMU noise to force the controller from
+          NORMAL into CAUTIOUS, RECOVERY, and HALT.
+        </p>
+      </aside>
+    </section>
+  </main>
+
+  <script src="simulation.js"></script>
+</body>
+</html>
